@@ -5,6 +5,10 @@
 //   - one "watering" switch per zone (on = water for the run time, off = stop)
 //   - "Run time" (minutes, writable): how long a switched-on zone waters
 //   - "Rain delay" (hours, writable): 0 cancels it
+//   - "Next watering" (text): next scheduled start, e.g. "Thu 1 Oct 09:00 · Bonsai"
+//   - "Fault" (text): "OK" or the station faults the timer reports
+// plus scene triggers (watering started / finished, zone fault / fault
+// cleared) and scene actions (water a zone for N minutes, stop, rain delay).
 // State comes from the B-hyve websocket event stream, backed by a periodic
 // REST poll so a missed event cannot leave a zone stuck "on".
 // -----------------------------------------------------------------------------
@@ -18,6 +22,7 @@ import {
   DEVICE_FEATURE_UNITS,
 } from '@gladysassistant/integration-sdk';
 import { BhyveClient, AuthenticationError } from './src/bhyve.js';
+import { formatNextWatering, formatFault, faultsOf } from './src/format.js';
 
 const STATE_FILE = '/data/state.json';
 const DEFAULT_RUN_TIME = 10;
@@ -31,6 +36,15 @@ let pollTimer = null;
 const sprinklers = new Map();
 // B-hyve device id -> run time in minutes (persisted in /data).
 let runTimes = {};
+// B-hyve device id -> its timer programs (a, b, c…), for program names.
+const programsByDevice = new Map();
+// B-hyve device id -> fault text last seen; absent until the first read, so a
+// restart never fires a scene trigger by itself.
+const lastFaults = new Map();
+// B-hyve device id -> station watering at the last check (null = idle); absent
+// until the first read, for the same reason.
+const lastWatering = new Map();
+let refreshSoonTimer = null;
 
 // --- Helpers -----------------------------------------------------------------
 
@@ -121,6 +135,28 @@ function buildDevice(device) {
         min: 0,
         max: 168,
       },
+      {
+        name: 'Next watering',
+        external_id: id.feature('next-watering'),
+        category: DEVICE_FEATURE_CATEGORIES.TEXT,
+        type: DEVICE_FEATURE_TYPES.TEXT.TEXT,
+        read_only: true,
+        has_feedback: false,
+        keep_history: false,
+        min: 0,
+        max: 0,
+      },
+      {
+        name: 'Fault',
+        external_id: id.feature('fault'),
+        category: DEVICE_FEATURE_CATEGORIES.TEXT,
+        type: DEVICE_FEATURE_TYPES.TEXT.TEXT,
+        read_only: true,
+        has_feedback: false,
+        keep_history: false,
+        min: 0,
+        max: 0,
+      },
     ],
   };
 }
@@ -141,6 +177,11 @@ function statesOf(device) {
     })),
     { device_feature_external_id: id.feature('run-time'), state: runTimeOf(device.id) },
     { device_feature_external_id: id.feature('rain-delay'), state: Number(device.status?.rain_delay ?? 0) },
+    {
+      device_feature_external_id: id.feature('next-watering'),
+      text: formatNextWatering(device, programsByDevice.get(device.id)),
+    },
+    { device_feature_external_id: id.feature('fault'), text: formatFault(device) },
   ];
 }
 
@@ -159,8 +200,99 @@ async function refreshFromCloud() {
   const devices = await client.getSprinklers();
   sprinklers.clear();
   for (const device of devices) sprinklers.set(device.id, device);
+  try {
+    const programs = await client.getPrograms();
+    programsByDevice.clear();
+    for (const program of programs) {
+      if (!programsByDevice.has(program.device_id)) programsByDevice.set(program.device_id, []);
+      programsByDevice.get(program.device_id).push(program);
+    }
+  } catch (err) {
+    // Only costs the program names in "Next watering".
+    logger.warn(`Could not read timer programs: ${err.message}`);
+  }
   await publishAllStates();
+  for (const device of devices) await checkTransitions(device);
   return devices;
+}
+
+/** A refresh a few seconds from now, coalescing bursts of events. */
+function refreshSoon() {
+  clearTimeout(refreshSoonTimer);
+  refreshSoonTimer = setTimeout(() => {
+    if (client) refreshFromCloud().catch((err) => logger.warn(`Refresh failed: ${err.message}`));
+  }, 5000);
+}
+
+// --- Scene triggers -------------------------------------------------------------
+
+async function fireSceneEvent(key, data) {
+  logger.info(`scene event ${key}: ${JSON.stringify(data)}`);
+  try {
+    await gladys.publishSceneEvent(key, data);
+  } catch (err) {
+    // A refused event (older core, rate limit) must not break state handling.
+    logger.error(`Cannot fire the scene trigger ${key}`, err);
+  }
+}
+
+function zoneNameOf(device, station) {
+  return zonesOf(device).find((z) => z.station === Number(station))?.name ?? `Zone ${station}`;
+}
+
+function programNameOf(device, letter) {
+  if (!letter || letter === 'manual') return 'manual';
+  const program = (programsByDevice.get(device.id) ?? []).find((p) => p.program === letter);
+  return program?.name || `program ${String(letter).toUpperCase()}`;
+}
+
+async function checkTransitions(device) {
+  await checkWatering(device);
+  await checkFaults(device);
+}
+
+async function checkWatering(device) {
+  const current = currentStation(device);
+  const hadReference = lastWatering.has(device.id);
+  const previous = lastWatering.get(device.id) ?? null;
+  lastWatering.set(device.id, current);
+  if (!hadReference || previous === current) return;
+
+  const base = { timer: ids(device.id).device, timer_name: device.name };
+  if (previous !== null) {
+    await fireSceneEvent('watering_finished', {
+      ...base,
+      zone: zoneNameOf(device, previous),
+      station: previous,
+    });
+  }
+  if (current !== null) {
+    const ws = device.status?.watering_status ?? {};
+    await fireSceneEvent('watering_started', {
+      ...base,
+      zone: zoneNameOf(device, current),
+      station: current,
+      minutes: Number.isFinite(Number(ws.run_time)) ? Number(ws.run_time) : null,
+      program: programNameOf(device, ws.program),
+    });
+  }
+}
+
+async function checkFaults(device) {
+  const current = formatFault(device);
+  const previous = lastFaults.get(device.id);
+  lastFaults.set(device.id, current);
+  if (previous === undefined || previous === current) return;
+
+  const faults = faultsOf(device);
+  const key = faults.length > 0 ? 'zone_fault' : 'fault_cleared';
+  const data = {
+    timer: ids(device.id).device,
+    timer_name: device.name,
+    fault: faults.length > 0 ? current : previous,
+    fault_count: faults.length,
+  };
+  await fireSceneEvent(key, data);
 }
 
 async function publishDevices() {
@@ -179,6 +311,7 @@ function applyEvent(data) {
       status.watering_status = {
         current_station: data.current_station,
         program: data.program,
+        run_time: data.run_time,
         started_watering_station_at: data.started_watering_station_at,
       };
       status.run_mode = data.mode ?? 'manual';
@@ -187,6 +320,8 @@ function applyEvent(data) {
     case 'device_idle':
       delete status.watering_status;
       if (data.event === 'device_idle') status.run_mode = 'off';
+      // The next scheduled start moves once a run finishes.
+      refreshSoon();
       return true;
     case 'change_mode':
       status.run_mode = data.mode ?? status.run_mode;
@@ -195,14 +330,24 @@ function applyEvent(data) {
       return true;
     case 'rain_delay':
       status.rain_delay = Number(data.delay ?? 0);
+      refreshSoon();
       return true;
+    case 'fault':
+      status.station_faults = data.station_faults ?? [];
+      return true;
+    case 'program_changed':
+      refreshSoon();
+      return false;
     default:
       return false;
   }
 }
 
 async function onBhyveEvent(data) {
-  if (applyEvent(data)) await publishAllStates();
+  if (!applyEvent(data)) return;
+  await publishAllStates();
+  const device = sprinklers.get(data.device_id);
+  if (device) await checkTransitions(device);
 }
 
 // --- Lifecycle -----------------------------------------------------------------
@@ -255,6 +400,8 @@ async function start() {
 function stop() {
   clearInterval(pollTimer);
   pollTimer = null;
+  clearTimeout(refreshSoonTimer);
+  refreshSoonTimer = null;
   client?.close();
   client = null;
 }
@@ -307,6 +454,54 @@ gladys.onSetValue(async (device, feature, value) => {
   }
 
   throw new Error(`Unknown feature ${feature.external_id}`);
+});
+
+// --- Scene actions ----------------------------------------------------------------
+
+function timerFor(fields) {
+  if (!client) throw new Error('B-hyve is not connected');
+  const all = [...sprinklers.values()];
+  if (!fields.timer) {
+    if (all.length === 1) return all[0];
+    throw new Error('Choose a timer: this account has several');
+  }
+  const device = all.find((d) => ids(d.id).device === fields.timer);
+  if (!device) throw new Error(`Unknown B-hyve timer ${fields.timer}`);
+  return device;
+}
+
+/** A zone by station number or by name (case-insensitive). */
+function zoneFor(device, value) {
+  const wanted = String(value ?? '').trim();
+  const zones = zonesOf(device);
+  const zone =
+    zones.find((z) => String(z.station) === wanted) ??
+    zones.find((z) => z.name.toLowerCase() === wanted.toLowerCase());
+  if (!zone) {
+    throw new Error(`No zone "${wanted}" on ${device.name}: ${zones.map((z) => `${z.station} ${z.name}`).join(', ')}`);
+  }
+  return zone;
+}
+
+gladys.onSceneAction('water_zone', async (fields) => {
+  const device = timerFor(fields);
+  const zone = zoneFor(device, fields.zone);
+  const minutes = Math.min(120, Math.max(1, Math.round(Number(fields.minutes ?? runTimeOf(device.id)))));
+  client.startWatering(device.id, zone.station, minutes);
+  return { timer_name: device.name, zone: zone.name, minutes };
+});
+
+gladys.onSceneAction('stop_watering', async (fields) => {
+  const device = timerFor(fields);
+  client.stopWatering(device.id);
+  return { timer_name: device.name };
+});
+
+gladys.onSceneAction('set_rain_delay', async (fields) => {
+  const device = timerFor(fields);
+  const hours = Math.min(168, Math.max(0, Math.round(Number(fields.hours ?? 0))));
+  client.setRainDelay(device.id, hours);
+  return { timer_name: device.name, hours };
 });
 
 gladys.onConfigUpdated(async (newConfig) => {

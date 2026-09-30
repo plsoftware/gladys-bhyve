@@ -14,6 +14,20 @@ timer's own schedule or from the B-hyve app shows up in Gladys immediately.
 | `<zone> watering` | switch | On waters the zone for *Run time*; off stops watering |
 | Run time | duration, minutes | 1–120, default 10; persisted in `/data` |
 | Rain delay | duration, hours | 0–168; 0 cancels |
+| Next watering | text | Next scheduled start in the timer's timezone, e.g. `Thu 1 Oct 09:00 · Bonsai` |
+| Fault | text | `OK`, or the station faults the timer reports |
+
+## Scenes
+
+**Triggers** (Add trigger → Integrations): *watering started*, *watering
+finished* (filter by timer and zone name; variables `timer_name`, `zone`,
+`station`, `minutes`, `program`), *zone fault*, *fault cleared* (variables
+`timer_name`, `fault`, `fault_count`). Use them in messages as
+`{{triggerEvent.data.zone}}` etc.
+
+**Actions** (Add a step → Integrations): *water a zone* (zone name or number,
+minutes), *stop watering*, *set rain delay* (hours, 0 cancels). The timer can
+be left empty on an account with a single timer.
 
 ## Install
 

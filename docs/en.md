@@ -9,6 +9,14 @@ same API and event stream as the B-hyve app.
   *Run time*; off stops watering.
 - **Run time** — minutes a switched-on zone waters (1–120, default 10).
 - **Rain delay** — hours to suspend scheduled programs (0–168; 0 cancels).
+- **Next watering** — the next scheduled start and program, e.g. `Thu 1 Oct 09:00 · Bonsai`.
+- **Fault** — `OK`, or the zone faults the timer reports.
+
+## Scenes
+
+- **Triggers:** watering started, watering finished (filter by zone name), zone
+  fault, fault cleared.
+- **Actions:** water a zone for N minutes, stop watering, set a rain delay.
 
 Watering started by the timer's own schedule or from the B-hyve app is reflected
 live over the event stream.

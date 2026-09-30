@@ -9,6 +9,15 @@ la même API et le même flux d'événements que l'application B-hyve.
   la *Durée* en cours ; éteint, il arrête l'arrosage.
 - **Durée** — minutes d'arrosage d'une zone allumée (1 à 120, 10 par défaut).
 - **Report pluie** — heures de suspension des programmes (0 à 168 ; 0 annule).
+- **Prochain arrosage** — le prochain démarrage prévu et son programme.
+- **Défaut** — `OK`, ou les défauts de zone signalés par le programmateur.
+
+## Scènes
+
+- **Déclencheurs :** arrosage démarré, arrosage terminé (filtre par nom de
+  zone), défaut de zone, défaut résolu.
+- **Actions :** arroser une zone pendant N minutes, arrêter l'arrosage, régler
+  un report pluie.
 
 Un arrosage lancé par le programme du programmateur ou depuis l'application B-hyve
 est reflété en direct via le flux d'événements.

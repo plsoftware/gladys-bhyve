@@ -8,7 +8,7 @@
   },
   "version": "0.1.1",
   "docker_image": "ghcr.io/plsoftware/gladys-bhyve:0.1.1",
-  "gladys_version": ">=4.86.0",
+  "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/plsoftware/gladys-bhyve/main/cover.png",
   "categories": [
     "environment",
@@ -63,6 +63,362 @@
       "default": 300,
       "min": 60,
       "max": 3600
+    }
+  ],
+  "scene_triggers": [
+    {
+      "key": "watering_started",
+      "label": {
+        "en": "B-hyve: watering started",
+        "fr": "B-hyve : arrosage démarré"
+      },
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (any when empty)",
+            "fr": "Programmateur (tous si vide)"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "label": {
+            "en": "Zone name (any when empty)",
+            "fr": "Nom de la zone (toutes si vide)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "label": {
+            "en": "Zone name",
+            "fr": "Nom de la zone"
+          }
+        },
+        {
+          "key": "station",
+          "type": "number",
+          "label": {
+            "en": "Zone number",
+            "fr": "Numéro de zone"
+          }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": {
+            "en": "Run time (min)",
+            "fr": "Durée (min)"
+          }
+        },
+        {
+          "key": "program",
+          "type": "string",
+          "label": {
+            "en": "Program (or manual)",
+            "fr": "Programme (ou manuel)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "watering_finished",
+      "label": {
+        "en": "B-hyve: watering finished",
+        "fr": "B-hyve : arrosage terminé"
+      },
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (any when empty)",
+            "fr": "Programmateur (tous si vide)"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "label": {
+            "en": "Zone name (any when empty)",
+            "fr": "Nom de la zone (toutes si vide)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "label": {
+            "en": "Zone name",
+            "fr": "Nom de la zone"
+          }
+        },
+        {
+          "key": "station",
+          "type": "number",
+          "label": {
+            "en": "Zone number",
+            "fr": "Numéro de zone"
+          }
+        }
+      ]
+    },
+    {
+      "key": "zone_fault",
+      "label": {
+        "en": "B-hyve: zone fault",
+        "fr": "B-hyve : défaut de zone"
+      },
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (any when empty)",
+            "fr": "Programmateur (tous si vide)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "fault",
+          "type": "string",
+          "label": {
+            "en": "Fault description",
+            "fr": "Description du défaut"
+          }
+        },
+        {
+          "key": "fault_count",
+          "type": "number",
+          "label": {
+            "en": "Number of faults",
+            "fr": "Nombre de défauts"
+          }
+        }
+      ]
+    },
+    {
+      "key": "fault_cleared",
+      "label": {
+        "en": "B-hyve: fault cleared",
+        "fr": "B-hyve : défaut résolu"
+      },
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (any when empty)",
+            "fr": "Programmateur (tous si vide)"
+          }
+        }
+      ],
+      "variables": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "fault",
+          "type": "string",
+          "label": {
+            "en": "Fault description",
+            "fr": "Description du défaut"
+          }
+        },
+        {
+          "key": "fault_count",
+          "type": "number",
+          "label": {
+            "en": "Number of faults",
+            "fr": "Nombre de défauts"
+          }
+        }
+      ]
+    }
+  ],
+  "scene_actions": [
+    {
+      "key": "water_zone",
+      "label": {
+        "en": "B-hyve: water a zone",
+        "fr": "B-hyve : arroser une zone"
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (optional with a single timer)",
+            "fr": "Programmateur (facultatif s'il n'y en a qu'un)"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Zone (name or number)",
+            "fr": "Zone (nom ou numéro)"
+          }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "required": true,
+          "default": 10,
+          "min": 1,
+          "max": 120,
+          "label": {
+            "en": "Minutes",
+            "fr": "Minutes"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "zone",
+          "type": "string",
+          "label": {
+            "en": "Zone name",
+            "fr": "Nom de la zone"
+          }
+        },
+        {
+          "key": "minutes",
+          "type": "number",
+          "label": {
+            "en": "Minutes",
+            "fr": "Minutes"
+          }
+        }
+      ]
+    },
+    {
+      "key": "stop_watering",
+      "label": {
+        "en": "B-hyve: stop watering",
+        "fr": "B-hyve : arrêter l'arrosage"
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (optional with a single timer)",
+            "fr": "Programmateur (facultatif s'il n'y en a qu'un)"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        }
+      ]
+    },
+    {
+      "key": "set_rain_delay",
+      "label": {
+        "en": "B-hyve: set rain delay",
+        "fr": "B-hyve : report pluie"
+      },
+      "timeout_seconds": 15,
+      "fields": [
+        {
+          "key": "timer",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Timer (optional with a single timer)",
+            "fr": "Programmateur (facultatif s'il n'y en a qu'un)"
+          }
+        },
+        {
+          "key": "hours",
+          "type": "number",
+          "required": true,
+          "default": 24,
+          "min": 0,
+          "max": 168,
+          "label": {
+            "en": "Hours (0 cancels)",
+            "fr": "Heures (0 annule)"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "key": "timer_name",
+          "type": "string",
+          "label": {
+            "en": "Timer name",
+            "fr": "Nom du programmateur"
+          }
+        },
+        {
+          "key": "hours",
+          "type": "number",
+          "label": {
+            "en": "Hours",
+            "fr": "Heures"
+          }
+        }
+      ]
     }
   ]
 }
