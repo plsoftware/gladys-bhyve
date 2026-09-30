@@ -15,5 +15,5 @@
     "@gladysassistant/integration-sdk": "^0.14.0",
     "ws": "^8.18.0"
   },
-  "license": "UNLICENSED"
+  "license": "MIT"
 }

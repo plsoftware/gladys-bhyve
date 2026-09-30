@@ -33,3 +33,11 @@ Actions → **Release** → Run workflow → pick patch / minor / major. It bump
 ```bash
 docker build -t gladys-bhyve:dev .
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Credits
+
+Cover icon: [Honeycomb icons created by Freepik – Flaticon](https://www.flaticon.com/free-icons/honeycomb).

@@ -10,6 +10,10 @@
   "docker_image": "ghcr.io/plsoftware/gladys-bhyve:0.1.0",
   "gladys_version": ">=4.86.0",
   "cover_image": "https://raw.githubusercontent.com/plsoftware/gladys-bhyve/main/cover.png",
+  "categories": [
+    "environment",
+    "appliances"
+  ],
   "transports": [
     "cloud"
   ],
