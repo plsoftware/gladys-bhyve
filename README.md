@@ -36,7 +36,7 @@ docker build -t gladys-bhyve:dev .
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Copyright 2026 Stuart Tremain.
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 ## Credits
 
