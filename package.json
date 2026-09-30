@@ -1,6 +1,6 @@
 {
   "name": "gladys-bhyve",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Orbit B-hyve sprinkler timers as a Gladys Assistant external integration.",
   "type": "module",
